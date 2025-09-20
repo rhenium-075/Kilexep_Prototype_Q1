@@ -1,0 +1,142 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: kilexep-db
+    environment:
+      POSTGRES_DB: kilexep
+      POSTGRES_USER: kilexep_user
+      POSTGRES_PASSWORD: kilexep_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kilexep_user -d kilexep"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: kilexep-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: kilexep-backend
+    environment:
+      - DJANGO_SETTINGS_MODULE=kilexep_backend.settings
+      - DJANGO_SECRET_KEY=django-insecure-dev-key-change-in-production-abc123def456ghi789jkl
+      - DJANGO_DEBUG=true
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,backend,kilexep-backend
+      - BETA_MODE=true
+      - DATABASE_URL=postgresql://kilexep_user:kilexep_password@db:5432/kilexep
+      - REDIS_URL=redis://redis:6379/0
+      - GOOGLE_CLIENT_ID=265367264562-2bab9s4ra37lhuler716redm9afn71sj.apps.googleusercontent.com
+      - GOOGLE_CLIENT_SECRET=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
+      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=265367264562-2bab9s4ra37lhuler716redm9afn71sj.apps.googleusercontent.com
+    expose:
+      - "8000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_static:/app/static
+      - backend_logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # celery-worker:
+  #   build:
+  #     context: .
+  #     dockerfile: backend/Dockerfile
+  #   container_name: kilexep-celery-worker
+  #   environment:
+  #     - DJANGO_SETTINGS_MODULE=kilexep_backend.settings
+  #     - DJANGO_SECRET_KEY=django-insecure-dev-key-change-in-production-abc123def456ghi789jkl
+  #     - DJANGO_DEBUG=true
+  #     - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,backend,kilexep-backend
+  #     - DATABASE_URL=postgresql://kilexep_user:kilexep_password@db:5432/kilexep
+  #     - REDIS_URL=redis://redis:6379/0
+  #     - GOOGLE_CLIENT_ID=265367264562-2bab9s4ra37lhuler716redm9afn71sj.apps.googleusercontent.com
+  #     - GOOGLE_CLIENT_SECRET=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
+  #   command: celery -A kilexep_backend worker --loglevel=info
+  #   volumes:
+  #     - backend_logs:/app/logs
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+
+  # celery-beat:
+  #   build:
+  #     context: .
+  #     dockerfile: backend/Dockerfile
+  #   container_name: kilexep-celery-beat
+  #   environment:
+  #     - DJANGO_SETTINGS_MODULE=kilexep_backend.settings
+  #     - DJANGO_SECRET_KEY=django-insecure-dev-key-change-in-production-abc123def456ghi789jkl
+  #     - DJANGO_DEBUG=true
+  #     - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,backend,kilexep-backend
+  #     - DATABASE_URL=postgresql://kilexep_user:kilexep_password@db:5432/kilexep
+  #     - REDIS_URL=redis://redis:6379/0
+  #     - GOOGLE_CLIENT_ID=265367264562-2bab9s4ra37lhuler716redm9afn71sj.apps.googleusercontent.com
+  #     - GOOGLE_CLIENT_SECRET=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
+  #   command: celery -A kilexep_backend beat --loglevel=info
+  #   volumes:
+  #     - backend_logs:/app/logs
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      # Reuse repo root; Dockerfile placed at backend/frontend/Dockerfile to avoid conflicts
+      dockerfile: backend/frontend/Dockerfile
+    container_name: kilexep-frontend
+    environment:
+      - FLASK_BASE_URL=http://nginx
+      - NEXT_TELEMETRY_DISABLED=1
+    expose:
+      - "3000"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: kilexep-nginx
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - backend_static:/srv/static:ro
+    restart: unless-stopped
+
+volumes:
+  backend_static:
+  backend_logs:
+  postgres_data:
+  redis_data:

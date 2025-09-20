@@ -1,0 +1,40 @@
+Django>=5.0
+pytz
+sqlparse
+asgiref
+
+# Database
+psycopg2-binary>=2.9.7
+dj-database-url>=2.1.0
+
+# Background Jobs
+celery>=5.3.4
+redis>=5.0.1
+django-celery-beat>=2.5.0
+django-celery-results>=2.5.0
+
+# Rate limiting
+django-ratelimit>=4.1.0
+
+djangorestframework>=3.15.0
+django-cors-headers>=4.3.1
+python-dotenv>=1.0.0
+django-allauth>=0.63.0
+dj-rest-auth>=5.0.0
+google-auth>=2.29.0
+PyJWT>=2.8.0
+cryptography>=41.0.0
+
+requests>=2.31.0
+pandas>=2.0.0
+openpyxl>=3.1.0
+
+selenium>=4.15.0
+pyperclip>=1.8.0
+
+google-generativeai>=0.3.0
+
+gunicorn>=21.2.0
+whitenoise>=6.6.0
+
+
